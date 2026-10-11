@@ -545,3 +545,29 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+/* Approved Ninomae OSINT owl identity */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.owl-logo {
+  width: 40px;
+  height: 40px;
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.footer-logo-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-owl {
+  width: 40px;
+  height: 40px;
+}
