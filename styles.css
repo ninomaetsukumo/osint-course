@@ -1033,3 +1033,45 @@ footer .footer-grid {
     grid-template-columns: 1fr;
   }
 }
+
+/* Align donation imagery and content with the main page container. */
+.donate-grid {
+  grid-template-columns: minmax(0, 30%) minmax(0, 42%) minmax(0, 28%);
+  gap: 0;
+  width: 100%;
+  max-width: 1390px;
+  margin: 0 auto;
+}
+
+.donate-picture {
+  width: 100%;
+  background-position: center;
+}
+
+.donate-copy {
+  padding: 12px 22px;
+}
+
+.donate-card {
+  margin: 10px 0 10px 10px;
+}
+
+@media (max-width: 950px) {
+  .donate-grid {
+    grid-template-columns: minmax(0, 40%) minmax(0, 60%);
+  }
+}
+
+@media (max-width: 640px) {
+  .donate-grid {
+    display: block;
+  }
+
+  .donate-picture {
+    width: 100%;
+  }
+
+  .donate-card {
+    margin: 0 0 20px;
+  }
+}
