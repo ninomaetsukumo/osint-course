@@ -82,7 +82,11 @@ a {
 }
 
 .hero {
-  background: radial-gradient(ellipse at 74% 27%,#e6d6bf 0%,#f7f3ea 40%,#fff 80%);
+  background-color: #f7f2ea;
+  background-image: url("assets/hero-background.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   border-bottom: 1px solid #e8e4dd;
 }
 
@@ -342,7 +346,11 @@ a {
 .donate-picture {
   height: 245px;
   border-radius: 5px;
-  background: linear-gradient(145deg,#393936,#1e2528);
+  background-color: #d2bda0;
+  background-image: url("assets/donation-background.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   display: flex;
   align-items: center;
   justify-content: center;
