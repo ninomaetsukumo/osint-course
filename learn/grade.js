@@ -15,7 +15,20 @@ async function init(){
  document.getElementById("auth-signup").onclick=()=>auth("signup");
  document.getElementById("auth-signout").onclick=async()=>{await client.auth.signOut();showUser(null);};
 }
-function showUser(user){document.getElementById("auth-signout").hidden=!user;document.getElementById("auth-signin").hidden=!!user;document.getElementById("auth-signup").hidden=!!user;status(user?"Signed in as "+user.email:"Not signed in. Assessment submissions require an account.");}
+function showUser(user){document.getElementById("auth-signout").hidden=!user;document.getElementById("auth-signin").hidden=!!user;document.getElementById("auth-signup").hidden=!!user;status(user?"Signed in as "+user.email:"Not signed in. Assessment submissions require an account.");refreshScores();}
+async function refreshScores(){
+ const login=document.getElementById("assessment-login");if(!login||!client)return;
+ let area=document.getElementById("assessment-scores");
+ if(!area){area=h("section");area.id="assessment-scores";login.append(area);}
+ const {data:{user},error:ue}=await client.auth.getUser();
+ if(ue||!user){area.replaceChildren();return;}
+ const {data,error}=await client.from("assessment_results").select("assessment_code,assessment_type,module_number,score,passed,submitted_at").order("submitted_at",{ascending:false}).limit(15);
+ area.replaceChildren();area.append(h("h3","Recent assessment results"));
+ if(error){area.append(h("p","Results temporarily unavailable."));return;}
+ if(!data?.length){area.append(h("p","No graded submissions recorded yet."));return;}
+ for(const entry of data){const name=entry.assessment_code||(entry.assessment_type+" module "+(entry.module_number??"final"));area.append(h("p",name+" — "+entry.score+"/100 ("+(entry.passed?"Passed":"Not passed")+") · "+new Date(entry.submitted_at).toLocaleDateString()));}
+}
+
 async function auth(type){if(!ready)return;const email=document.getElementById("auth-email").value.trim(),password=document.getElementById("auth-password").value;if(!email||!password){status("Enter an email address and password.");return;}status("Processing…");const result=type==="signin"?await client.auth.signInWithPassword({email,password}):await client.auth.signUp({email,password});if(result.error){status(result.error.message);return;}status(type==="signup"&&!result.data.session?"Registration submitted. Confirm the email before signing in.":"Signed in.");}
 function h(tag,txt){const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;return e;}
 function quiz(questions,code){
@@ -38,7 +51,7 @@ function quiz(questions,code){
   button.disabled=true;message.textContent="Submitting for secure grading…";
   try{
    const res=await fetch(endpoint+"/functions/v1/ninomae-grade-assessment",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,apikey:publishable,"Content-Type":"application/json"},body:JSON.stringify({assessment_code:code,answers})});
-   const data=await res.json();message.textContent=res.ok?"Recorded score: "+data.score+"/100 — "+(data.passed?"Passed":"Not passed")+".":data.error||"Submission failed.";
+   const data=await res.json();message.textContent=res.ok?"Recorded score: "+data.score+"/100 — "+(data.passed?"Passed":"Not passed")+".":data.error||"Submission failed.";if(res.ok)refreshScores();
   }catch(e){message.textContent="Unable to connect to grading service.";}finally{button.disabled=false;}
  };
  return form;
@@ -103,7 +116,7 @@ function mountCapstone(container){
   q.opts.forEach((o,j)=>{const label=h("label"),input=document.createElement("input");input.type="radio";input.name="q"+q.num;input.value="ABCD"[j];input.required=true;label.append(input,document.createTextNode(" "+o));field.append(label);});form.append(field);
  });
  const button=h("button","Submit Northbridge capstone securely");button.type="submit";const result=h("p");result.setAttribute("role","status");form.append(button,result);
- form.onsubmit=async e=>{e.preventDefault();if(!client){result.textContent="Sign-in is unavailable.";return;}const session=(await client.auth.getSession()).data.session;if(!session){result.textContent="Please sign in before submission.";return;}const answers=questions.map(q=>({question_code:"Q"+String(q.num).padStart(2,"0"),answer:form.elements["q"+q.num].value}));if(answers.some(a=>!a.answer)){result.textContent="Answer all 15 questions.";return;}button.disabled=true;result.textContent="Submitting for grading…";try{const response=await fetch(endpoint+"/functions/v1/ninomae-grade-assessment",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,apikey:publishable,"Content-Type":"application/json"},body:JSON.stringify({assessment_code:"FREE-FOUNDATIONS-CAPSTONE",answers})});const d=await response.json();result.textContent=response.ok?"Recorded capstone score: "+d.score+"/100 — "+(d.passed?"Passed":"Not passed")+". Certificates are not issued yet.":d.error||"Submission unsuccessful."; }catch(err){result.textContent="Unable to connect to grading service.";}finally{button.disabled=false;}};
+ form.onsubmit=async e=>{e.preventDefault();if(!client){result.textContent="Sign-in is unavailable.";return;}const session=(await client.auth.getSession()).data.session;if(!session){result.textContent="Please sign in before submission.";return;}const answers=questions.map(q=>({question_code:"Q"+String(q.num).padStart(2,"0"),answer:form.elements["q"+q.num].value}));if(answers.some(a=>!a.answer)){result.textContent="Answer all 15 questions.";return;}button.disabled=true;result.textContent="Submitting for grading…";try{const response=await fetch(endpoint+"/functions/v1/ninomae-grade-assessment",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,apikey:publishable,"Content-Type":"application/json"},body:JSON.stringify({assessment_code:"FREE-FOUNDATIONS-CAPSTONE",answers})});const d=await response.json();result.textContent=response.ok?"Recorded capstone score: "+d.score+"/100 — "+(d.passed?"Passed":"Not passed")+". Certificates are not issued yet.":d.error||"Submission unsuccessful.";if(response.ok)refreshScores(); }catch(err){result.textContent="Unable to connect to grading service.";}finally{button.disabled=false;}};
  container.prepend(form);
  }).catch(e=>{const p=h("p","Graded capstone currently unavailable: "+e.message);container.prepend(p);});
 }
