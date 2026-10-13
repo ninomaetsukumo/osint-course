@@ -18,10 +18,51 @@ async function init(){
 function showUser(user){document.getElementById("auth-signout").hidden=!user;document.getElementById("auth-signin").hidden=!!user;document.getElementById("auth-signup").hidden=!!user;status(user?"Signed in as "+user.email:"Not signed in. Assessment submissions require an account.");}
 async function auth(type){if(!ready)return;const email=document.getElementById("auth-email").value.trim(),password=document.getElementById("auth-password").value;if(!email||!password){status("Enter an email address and password.");return;}status("Processing…");const result=type==="signin"?await client.auth.signInWithPassword({email,password}):await client.auth.signUp({email,password});if(result.error){status(result.error.message);return;}status(type==="signup"&&!result.data.session?"Registration submitted. Confirm the email before signing in.":"Signed in.");}
 function h(tag,txt){const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;return e;}
-function quiz(block,code,capstone){const headings=[...block.querySelectorAll("h4")].filter(x=>/^Question (?:[1-9]|10)$/.test(x.textContent.trim()));if(headings.length!==10)return;let q=[];for(const heading of headings){const between=[];let el=heading.nextElementSibling;while(el&&!/^H[234]$/.test(el.tagName)){between.push(el.textContent.trim());el=el.nextElementSibling;}const body=between.join("\n");const options=[...body.matchAll(/(?:^|\n)([A-D])\.\s*([^\n]+)/g)];if(options.length<3)return;q.push({prompt:body.split("\n")[0],choices:options.map(m=>({letter:m[1],label:m[2].trim()}))});}
-const form=h("form");form.className="graded-form";form.append(h("h3","Submit "+code+" for grading"));form.append(h("p","Each correct answer is worth 10 points. The passing score is 80/100. Results are saved only after signed-in submission."));q.forEach((item,i)=>{const box=h("fieldset");const legend=h("legend",(i+1)+". "+item.prompt);box.append(legend);item.choices.forEach(c=>{const label=h("label");const input=document.createElement("input");input.type="radio";input.name="q"+i;input.value=c.letter;input.required=true;label.append(input,document.createTextNode(" "+c.letter+". "+c.label));box.append(label);});form.append(box);});const button=h("button","Submit answers securely");button.type="submit";const result=h("p");result.setAttribute("role","status");form.append(button,result);form.onsubmit=async event=>{event.preventDefault();if(!ready){result.textContent="Authentication is unavailable.";return;}const session=(await client.auth.getSession()).data.session;if(!session){result.textContent="Sign in before submitting.";return;}const answers=q.map((_,i)=>({question_code:"Q"+String(i+1).padStart(2,"0"),answer:form.elements["q"+i].value}));if(answers.some(a=>!a.answer)){result.textContent="Answer all questions.";return;}button.disabled=true;result.textContent="Grading…";try{const response=await fetch(endpoint+"/functions/v1/ninomae-grade-assessment",{method:"POST",headers:{"Authorization":"Bearer "+session.access_token,"apikey":publishable,"Content-Type":"application/json"},body:JSON.stringify({assessment_code:code,answers})});const d=await response.json();result.textContent=response.ok?"Recorded score: "+d.score+"/100 — "+(d.passed?"Passed":"Not passed")+". Certificate issuance is not active.":(d.error||"Submission failed.");}catch(e){result.textContent="Could not reach the grading service."; }finally{button.disabled=false;}};block.prepend(form);}
-function mountModule(num,container){const div=[...container.querySelectorAll("h3")];const first=div.find(x=>/knowledge assessment/i.test(x.textContent));const practical=div.find(x=>/practical assessment|M01-PA/i.test(x.textContent));if(first){const slot=h("div");first.after(slot);const temp=h("div");let node=first.nextElementSibling;while(node&&node!==practical){temp.append(node.cloneNode(true));node=node.nextElementSibling;}quiz(temp,"M0"+num+"-KNOWLEDGE");if(temp.querySelector(".graded-form"))slot.append(temp.querySelector(".graded-form"));}
-if(num===2){
+function quiz(questions,code){
+ if(questions.length!==10||questions.some(q=>q.choices.length<3||q.choices.length>4))return null;
+ const form=h("form");form.className="graded-form";
+ form.append(h("h3","Submit "+code+" for grading"));
+ form.append(h("p","Ten questions, 100 points. Passing score: 80. Sign in before submitting."));
+ questions.forEach((q,i)=>{
+  const field=h("fieldset");field.append(h("legend",(i+1)+". "+q.prompt));
+  q.choices.forEach((c,j)=>{const label=h("label"),input=document.createElement("input");input.type="radio";input.name="q"+i;input.value="ABCD"[j];input.required=true;label.append(input,document.createTextNode(" "+String.fromCharCode(65+j)+". "+c));field.append(label);});
+  form.append(field);
+ });
+ const button=h("button","Submit answers securely"),message=h("p");button.type="submit";message.setAttribute("role","status");form.append(button,message);
+ form.onsubmit=async e=>{
+  e.preventDefault();if(!client){message.textContent="Authentication unavailable.";return;}
+  const session=(await client.auth.getSession()).data.session;
+  if(!session){message.textContent="Sign in before submitting.";return;}
+  const answers=questions.map((_,i)=>({question_code:"Q"+String(i+1).padStart(2,"0"),answer:form.elements["q"+i].value}));
+  if(answers.some(a=>!a.answer)){message.textContent="Answer all ten questions.";return;}
+  button.disabled=true;message.textContent="Submitting for secure grading…";
+  try{
+   const res=await fetch(endpoint+"/functions/v1/ninomae-grade-assessment",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,apikey:publishable,"Content-Type":"application/json"},body:JSON.stringify({assessment_code:code,answers})});
+   const data=await res.json();message.textContent=res.ok?"Recorded score: "+data.score+"/100 — "+(data.passed?"Passed":"Not passed")+".":data.error||"Submission failed.";
+  }catch(e){message.textContent="Unable to connect to grading service.";}finally{button.disabled=false;}
+ };
+ return form;
+}
+function questionsFromMarkdown(raw){
+ const out=[];
+ const pattern=/^### Question (\d+)\s*\n([\s\S]*?)(?=^### Question \d+|^## |$(?![\s\S]))/gm;
+ for(const match of raw.matchAll(pattern)){
+  const lines=match[2].trim().split("\n").map(x=>x.trim()).filter(Boolean);
+  const choiceIndex=lines.findIndex(x=>/^[A-D]\.\s+/.test(x));
+  if(choiceIndex<0)continue;
+  const choices=lines.slice(choiceIndex).filter(x=>/^[A-D]\.\s+/.test(x)).map(x=>x.slice(3));
+  out.push({num:Number(match[1]),prompt:lines.slice(0,choiceIndex).join(" "),choices});
+ }
+ return out;
+}
+function mountModule(num,container,raw){
+ const all=questionsFromMarkdown(raw);
+ const knowledge=all.slice(0,10);
+ const practical=num===2?[]:all.slice(10,20);
+ const first=[...container.querySelectorAll("h3")].find(x=>/knowledge assessment/i.test(x.textContent));
+ const practicalHeading=[...container.querySelectorAll("h3")].find(x=>/practical assessment|M01-PA/i.test(x.textContent));
+ if(first&&knowledge.length===10){const form=quiz(knowledge,"M0"+num+"-KNOWLEDGE");if(form)first.after(form);}
+ if(num===2){
  const form=h("form");form.className="graded-form";form.append(h("h3","Module 02 — written practical submission"));
  form.append(h("p","Complete all five tasks using the fictional Eastford evidence packet. An instructor must review the answers. No automatic score is awarded."));
  const tasks=[
@@ -39,7 +80,7 @@ if(num===2){
  form.onsubmit=async e=>{e.preventDefault();if(!client){message.textContent="Authentication is unavailable.";return;}const session=(await client.auth.getSession()).data.session;if(!session){message.textContent="Sign in before submitting.";return;}const body=Object.fromEntries(tasks.map(([name])=>[name,textareas[name].value.trim()]));submit.disabled=true;message.textContent="Submitting…";try{const res=await fetch(endpoint+"/functions/v1/ninomae-submit-module02",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,apikey:publishable,"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await res.json();message.textContent=res.ok?"Submission saved. Status: pending instructor review. Reference: "+j.submission_id:(j.error||"Submission unsuccessful.");if(res.ok){form.reset();await showHistory();}}catch(_){message.textContent="Unable to reach the submission service.";}finally{submit.disabled=false;}};
  container.prepend(form);showHistory();return;
  }
-if(practical){const temp=h("div");let node=practical.nextElementSibling;while(node){temp.append(node.cloneNode(true));node=node.nextElementSibling;}quiz(temp,"M0"+num+"-PRACTICAL");if(temp.querySelector(".graded-form"))practical.after(temp.querySelector(".graded-form"));}
+if(practicalHeading&&practical.length===10){const form=quiz(practical,"M0"+num+"-PRACTICAL");if(form)practicalHeading.after(form);}
 }
 function mountCapstone(container){
  fetch("../course/free-foundations/final-capstone/student-capstone.md").then(r=>{if(!r.ok)throw Error("Capstone unavailable");return r.text();}).then(raw=>{
