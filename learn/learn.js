@@ -15,4 +15,4 @@ async function capstone(){current.mode="capstone";redraw();get("tabs").replaceCh
 get("mark").onclick=()=>{const id="F0"+(current.module+1)+".0"+(current.lesson+1);if(complete[id])delete complete[id];else complete[id]=true;try{localStorage.setItem(key,JSON.stringify(complete));}catch(e){}redraw();};
 get("prev").onclick=()=>{const n=current.module*5+current.lesson-1;if(n>=0)open(Math.floor(n/5),n%5,"lesson");};
 get("next").onclick=()=>{const n=current.module*5+current.lesson+1;if(n<25)open(Math.floor(n/5),n%5,"lesson");};
-get("capstone").onclick=capstone;open(0,0,"lesson");
+get("capstone").onclick=capstone;const requested=new URLSearchParams(location.search).get("module");const selected=/^[1-5]$/.test(requested||"")?Number(requested)-1:0;open(selected,0,"lesson");

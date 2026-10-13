@@ -571,3 +571,6 @@ footer {
 .donate-picture {
   background-position: center;
 }
+
+/* Foundations course entry points — existing card layout preserved */
+.foundation-actions{display:flex;gap:18px;align-items:center;flex-wrap:wrap;font:700 14px Arial,sans-serif}.foundation-actions a{text-decoration:none}.foundation-actions a:last-child{text-decoration:underline}.foundation-start{background:#252a2e;color:#fff;padding:12px 17px;border-radius:5px}.foundation-start:hover,.foundation-start:focus-visible{background:#493a2a;color:#fff}.modules .module-card{display:block;min-height:232px;border:1px solid #e0dfdb;border-radius:7px;padding:18px;background:#fff;box-shadow:0 6px 20px #36333208;text-decoration:none;color:inherit;transition:border-color .15s,transform .15s,box-shadow .15s}.modules .module-card:hover,.modules .module-card:focus-visible{border-color:#946e31;box-shadow:0 9px 22px #36333220;transform:translateY(-2px);outline-offset:3px}.modules .module-card h3{font-size:20px;line-height:1.13;margin:0 0 10px}.modules .module-card p{font:14px/1.45 Arial,sans-serif;color:#565b60;margin:0}@media(max-width:680px){.foundation-actions{margin-bottom:16px}}
