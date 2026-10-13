@@ -24,6 +24,30 @@ function mountModule(num,container){const div=[...container.querySelectorAll("h3
 if(num===2){const note=h("p","Module 02's practical is a written assignment and requires rubric-based review. It is not automatically graded.");container.prepend(note);return;}
 if(practical){const temp=h("div");let node=practical.nextElementSibling;while(node){temp.append(node.cloneNode(true));node=node.nextElementSibling;}quiz(temp,"M0"+num+"-PRACTICAL");if(temp.querySelector(".graded-form"))practical.after(temp.querySelector(".graded-form"));}
 }
-function mountCapstone(container){const el=h("p","The approved Northbridge capstone questions are available below. Authenticated capstone submission is being integrated and is not yet available.");container.prepend(el);}
+function mountCapstone(container){
+ fetch("../course/free-foundations/final-capstone/student-capstone.md").then(r=>{if(!r.ok)throw Error("Capstone unavailable");return r.text();}).then(raw=>{
+ const start=raw.indexOf("## Capstone assessment — 15 questions");
+ const end=raw.indexOf("## Final deliverable");
+ if(start<0||end<start)throw Error("Capstone source format");
+ const s=raw.slice(start,end);
+ const lines=s.split("\n");const questions=[];
+ for(let i=0;i<lines.length;i++){
+   const m=lines[i].trim().replaceAll(String.fromCharCode(92),"").match(/^([0-9]{1,2})\.\s+(.+)$/);
+   if(!m)continue;
+   const opts=[];let j=i+1;
+   while(j<lines.length&&opts.length<4){const t=lines[j++].trim();if(!t||/^[68] pts$/.test(t))continue;if(/^Stage [0-9]/.test(t)||/^[0-9]{1,2}\./.test(t.replaceAll(String.fromCharCode(92),"")))break;opts.push(t);}
+   if(opts.length===4)questions.push({num:Number(m[1]),prompt:m[2],opts});
+ }
+ if(questions.length!==15)throw Error("Capstone question parsing failed: "+questions.length);
+ const form=h("form");form.className="graded-form";form.append(h("h3","Northbridge final capstone — secure submission"));form.append(h("p","15 questions, 100 points, pass at 80. Sign in to submit and record a score."));
+ questions.forEach(q=>{
+  const field=h("fieldset");field.append(h("legend",q.num+". "+q.prompt));
+  q.opts.forEach((o,j)=>{const label=h("label"),input=document.createElement("input");input.type="radio";input.name="q"+q.num;input.value="ABCD"[j];input.required=true;label.append(input,document.createTextNode(" "+o));field.append(label);});form.append(field);
+ });
+ const button=h("button","Submit Northbridge capstone securely");button.type="submit";const result=h("p");result.setAttribute("role","status");form.append(button,result);
+ form.onsubmit=async e=>{e.preventDefault();if(!client){result.textContent="Sign-in is unavailable.";return;}const session=(await client.auth.getSession()).data.session;if(!session){result.textContent="Please sign in before submission.";return;}const answers=questions.map(q=>({question_code:"Q"+String(q.num).padStart(2,"0"),answer:form.elements["q"+q.num].value}));if(answers.some(a=>!a.answer)){result.textContent="Answer all 15 questions.";return;}button.disabled=true;result.textContent="Submitting for grading…";try{const response=await fetch(endpoint+"/functions/v1/ninomae-grade-assessment",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,apikey:publishable,"Content-Type":"application/json"},body:JSON.stringify({assessment_code:"FREE-FOUNDATIONS-CAPSTONE",answers})});const d=await response.json();result.textContent=response.ok?"Recorded capstone score: "+d.score+"/100 — "+(d.passed?"Passed":"Not passed")+". Certificates are not issued yet.":d.error||"Submission unsuccessful."; }catch(err){result.textContent="Unable to connect to grading service.";}finally{button.disabled=false;}};
+ container.prepend(form);
+ }).catch(e=>{const p=h("p","Graded capstone currently unavailable: "+e.message);container.prepend(p);});
+}
 window.NinomaeGrade={mountModule,mountCapstone};document.addEventListener("DOMContentLoaded",init);
 })();
